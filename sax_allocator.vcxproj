@@ -217,7 +217,9 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\mmap_virtual_allocator.hpp" />
     <ClInclude Include="include\plf_colony_allocator.hpp" />
+    <ClInclude Include="include\win_virtual_allocator.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />
