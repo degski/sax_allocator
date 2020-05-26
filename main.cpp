@@ -22,6 +22,8 @@
 // SOFTWARE.
 
 #include "include/plf_colony_allocator.hpp"
+#include "include/win_virtual_allocator.hpp"
+#include "include/mmap_virtual_allocator.hpp"
 
 #include <atomic>
 #include <sax/iostream.hpp>
