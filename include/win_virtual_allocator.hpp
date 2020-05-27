@@ -109,8 +109,7 @@ class alignas ( 32 ) win_allocator {
     struct win_virtual_type {
         friend class win_allocator;
 
-        static constexpr std::size_t windows_minimum_segement_size = win_allocator::windows_minimum_segement_size,
-                                     segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
+        static constexpr std::size_t segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
 
         win_virtual_type ( ) noexcept { allocate_segment_function_pointer = &this->allocate_initial_segment; };
         ~win_virtual_type ( ) {
