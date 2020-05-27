@@ -87,7 +87,7 @@ using mi_plf_set = std::set<T, C, mi_colony_node_allocator<T>>;
 template<typename T, typename C = std::less<T>>
 using stl_plf_set = std::set<T, C, stl_colony_node_allocator<T>>;
 
-int main ( ) {
+int main768 ( ) {
 
     constexpr std::size_t N = 1'000;
 
@@ -137,4 +137,52 @@ int main ( ) {
     }
 
     return EXIT_SUCCESS;
+}
+
+template<typename Type>
+struct Foo {
+    Type m_member;
+};
+
+// Template template class
+template<template<typename Type> class TemplateType>
+struct Bar {
+    TemplateType<int> m_ints;
+};
+
+template<template<template<typename> class> class TemplateTemplateType>
+struct Baz {
+    TemplateTemplateType<Foo> m_foos;
+};
+
+typedef Baz<Bar> Example;
+
+[[nodiscard]] HEDLEY_ALWAYS_INLINE std::size_t round_up_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
+    n_ += multiple_;
+    n_ -= 1;
+    n_ /= multiple_;
+    n_ *= multiple_;
+    return n_;
+}
+
+[[nodiscard]] HEDLEY_ALWAYS_INLINE void * round_up_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
+    std::size_t p;
+    std::memcpy ( &p, &pointer_, sizeof ( std::size_t ) );
+    p = round_up_multiple ( p, multiple_ );
+    std::memcpy ( &pointer_, &p, sizeof ( std::size_t ) );
+    return pointer_;
+}
+
+int main ( ){
+
+
+    std::size_t a = 656'868'786'787;
+
+    std::cout << a << nl << round_up_multiple ( &a, 65'536 ) << nl;
+
+  //  Example e;
+  //  e.m_foos.m_ints.m_member = 42;
+  //  std::cout << e.m_foos.m_ints.m_member << nl;
+
+    return 0;
 }

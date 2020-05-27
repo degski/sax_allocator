@@ -185,8 +185,20 @@ class alignas ( 32 ) win_allocator {
     const_pointer address ( const_reference x_ ) const { return &x_; }
 
     private:
-    [[nodiscard]] constexpr std::size_t round_up_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
-        return ( ( n_ - 1 + multiple_ ) / multiple_ ) * multiple_;
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE std::size_t round_up_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
+        n_ += multiple_;
+        n_ -= 1;
+        n_ /= multiple_;
+        n_ *= multiple_;
+        return n_;
+    }
+
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE void * round_up_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
+        std::size_t p;
+        std::memcpy ( &p, &pointer_, sizeof ( std::size_t ) );
+        p = round_up_multiple ( p, multiple_ );
+        std::memcpy ( &pointer_, &p, sizeof ( std::size_t ) );
+        return pointer_;
     }
 };
 

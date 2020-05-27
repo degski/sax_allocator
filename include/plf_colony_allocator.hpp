@@ -133,26 +133,7 @@ using stl_colony_node_allocator = colony_allocator<T, std::allocator>;
 
 #include "win_virtual_allocator.hpp"
 
-/*
-    // Simple template class
-    template<typename Type>
-    class Foo {
-        Type m_member;
-    };
-
-    // Template template class
-    template<template<typename...> class TemplateType>
-    class Bar {
-        TemplateType<int> data;
-    };
-
-    template<template<typename...> class TemplateTypeA, template<typename...> class TemplateTypeB>
-    class Baz {
-        TemplateTypeA<TemplateTypeB> data;
-};
-*/
-
-template<typename T, template<typename...> class TemplateTypeA, template<typename...> class TemplateTypeB, typename... Args>
+template<typename T, template<typename, typename> class TemplateTypeA, template<typename...> class TemplateTypeB, typename... Args>
 using template_template_type = TemplateTypeA<T, TemplateTypeB<T, Args...>>;
 
 // template<typename T, std::size_t SegmentSize = 65'536, std::size_t Capacity = 1'024 * SegmentSize>
