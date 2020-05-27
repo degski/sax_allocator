@@ -90,7 +90,11 @@ class win_allocator {
                 free ( base_pointer, committed );
         }
 
-        void * allocate ( std::size_t size_ ) { return *allocate_fp ( std::forward<std::size_t> ( size_ ) ); }
+        [[nodiscard]] void * allocate ( std::size_t size_ ) { return *allocate_fp ( std::forward<std::size_t> ( size_ ) ); }
+        void deallocate ( void * const pointer_, std::size_t size_ ) noexcept {
+            VirtualFree ( pointer_, 0, MEM_RELEASE );
+            base_pointer = nullptr, reserved = 0, committed = 0;
+        }
 
         void * base_pointer  = nullptr;
         std::size_t reserved = 0, committed = 0;
@@ -109,16 +113,11 @@ class win_allocator {
         }
 
         [[nodiscard]] void * allocate_regular ( std::size_t size_ ) {
-            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size_ - committed, size_,
+            if ( HEDLEY_UNLIKELY ( not base_pointer or not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size_ - committed, size_,
                                                       MEM_COMMIT, PAGE_READWRITE ) ) )
                 throw std::bad_alloc ( );
             committed = size_;
             return std::forward<void *> ( base_pointer );
-        }
-
-        void free ( void * const pointer_, std::size_t size_ ) noexcept {
-            VirtualFree ( pointer_, 0, MEM_RELEASE );
-            base_pointer = nullptr, reserved = 0, committed = 0;
         }
     };
 
