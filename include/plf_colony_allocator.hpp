@@ -15,7 +15,7 @@
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// FITNESS FOR Allocator PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -33,7 +33,7 @@
 
 #include <plf/plf_colony.h>
 
-template<typename T, template<typename> typename Allocator = std::allocator>
+template<typename T, template<typename> typename Allocator>
 class colony_allocator {
 
     template<typename U>
@@ -68,23 +68,19 @@ class colony_allocator {
 
     template<class U>
     struct rebind {
-        using other = colony_allocator<U>;
+        using other = allocator_type<U>;
     };
 
     colony_allocator ( ) noexcept                          = default;
     colony_allocator ( const colony_allocator & ) noexcept = default;
-    template<class U>
-    colony_allocator ( const colony_allocator<U> & ) noexcept {}
-
-    colony_allocator select_on_container_copy_construction ( ) const { return *this; }
 
     void deallocate ( T * ptr_, size_type ) { nodes.erase ( nodes.get_iterator_from_pointer ( ( uninitialized_type * ) ptr_ ) ); }
 
 #if ( __cplusplus >= 201703L ) // C++17
-    [[nodiscard]] T * allocate ( size_type count ) {
+    [[nodiscard]] T * allocate ( size_type size_ ) {
         return static_cast<T *> ( ( void * ) &*( colony_allocator::nodes.emplace ( ) ) );
     }
-    [[nodiscard]] T * allocate ( size_type count, void const * ) { return allocate ( count ); }
+    [[nodiscard]] T * allocate ( size_type size_, void const * ) { return allocate ( size_ ); }
 #else
     [[nodiscard]] pointer allocate ( size_type, void const * = 0 ) {
         return static_cast<pointer> ( ( void * ) &*( colony_allocator::nodes.emplace ( ) ) );
@@ -92,45 +88,72 @@ class colony_allocator {
 #endif
 
 #if ( ( __cplusplus >= 201103L ) || ( _MSC_VER > 1900 ) ) // C++11
-    using propagate_on_container_copy_assignment = std::true_type;
+    using propagate_on_container_copy_assignment = std::false_type;
     using propagate_on_container_move_assignment = std::true_type;
     using propagate_on_container_swap            = std::true_type;
-    using is_always_equal                        = std::true_type;
+    using is_always_equal                        = std::false_type;
 
     template<class U, class... Args>
-    void construct ( U * p, Args &&... args ) {
-        ::new ( p ) U ( std::forward<Args> ( args )... );
+    void construct ( U * p_, Args &&... args ) {
+        ::new ( p_ ) U ( std::forward<Args> ( args )... );
     }
     template<class U>
-    void destroy ( U * p ) noexcept {
-        p->~U ( );
+    void destroy ( U * p_ ) noexcept {
+        p_->~U ( );
     }
 #else
-    void construct ( pointer p, value_type const & val ) { ::new ( p ) value_type ( val ); }
-    void destroy ( pointer p ) { p->~value_type ( ); }
+    void construct ( pointer p_, value_type const & val ) { ::new ( p_ ) value_type ( val ); }
+    void destroy ( pointer p_ ) { p_->~value_type ( ); }
 #endif
 
     size_type max_size ( ) const noexcept { return ( PTRDIFF_MAX / sizeof ( value_type ) ); }
-    pointer address ( reference x ) const { return &x; }
-    const_pointer address ( const_reference x ) const { return &x; }
+    pointer address ( reference x_ ) const { return &x_; }
+    const_pointer address ( const_reference x_ ) const { return &x_; }
 };
 
 template<typename T, template<typename> typename Allocator>
 typename colony_allocator<T, Allocator>::colony_container colony_allocator<T, Allocator>::nodes;
 
-template<class T1, class T2>
-bool operator== ( const colony_allocator<T1> &, const colony_allocator<T2> & ) noexcept {
-    return true;
-}
-template<class T1, class T2>
-bool operator!= ( const colony_allocator<T1> &, const colony_allocator<T2> & ) noexcept {
+template<typename T1, typename T2, template<typename> typename Allocator>
+bool operator== ( const colony_allocator<T1, Allocator> &, const colony_allocator<T2, Allocator> & ) noexcept {
     return false;
+}
+template<typename T1, typename T2, template<typename> typename Allocator>
+bool operator!= ( const colony_allocator<T1, Allocator> &, const colony_allocator<T2, Allocator> & ) noexcept {
+    return true;
 }
 
 #define USE_MIMALLOC_LTO 1
 #include <mimalloc.h>
 
 template<typename T>
-using mi_colony_allocator = colony_allocator<T, mi_stl_allocator>;
+using mi_colony_node_allocator = colony_allocator<T, mi_stl_allocator>;
 template<typename T>
-using stl_colony_allocator = colony_allocator<T, std::allocator>;
+using stl_colony_node_allocator = colony_allocator<T, std::allocator>;
+
+#include "win_virtual_allocator.hpp"
+
+/*
+    // Simple template class
+    template<typename Type>
+    class Foo {
+        Type m_member;
+    };
+
+    // Template template class
+    template<template<typename...> class TemplateType>
+    class Bar {
+        TemplateType<int> data;
+    };
+
+    template<template<typename...> class TemplateTypeA, template<typename...> class TemplateTypeB>
+    class Baz {
+        TemplateTypeA<TemplateTypeB> data;
+};
+*/
+
+template<typename T, template<typename...> class TemplateTypeA, template<typename...> class TemplateTypeB, typename... Args>
+using template_template_type = TemplateTypeA<T, TemplateTypeB<T, Args...>>;
+
+// template<typename T, std::size_t SegmentSize = 65'536, std::size_t Capacity = 1'024 * SegmentSize>
+// using win_colony_allocator = template_template_type<>;

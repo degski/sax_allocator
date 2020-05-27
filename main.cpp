@@ -15,7 +15,7 @@
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// FITNESS FOR Allocator PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -82,10 +82,10 @@ namespace Rng {
 sax::Rng & rng = Rng::generator ( );
 
 template<typename T, typename C = std::less<T>>
-using mi_plf_set = std::set<T, C, mi_colony_allocator<T>>;
+using mi_plf_set = std::set<T, C, mi_colony_node_allocator<T>>;
 
 template<typename T, typename C = std::less<T>>
-using stl_plf_set = std::set<T, C, stl_colony_allocator<T>>;
+using stl_plf_set = std::set<T, C, stl_colony_node_allocator<T>>;
 
 int main ( ) {
 

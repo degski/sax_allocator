@@ -15,7 +15,7 @@
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// FITNESS FOR Allocator PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -71,7 +71,7 @@ class mmap_allocator {
         using other = mmap_allocator<U>;
     };
 
-    mmap_allocator ( ) noexcept                          = default;
+    mmap_allocator ( ) noexcept                        = default;
     mmap_allocator ( const mmap_allocator & ) noexcept = default;
     template<class U>
     mmap_allocator ( const mmap_allocator<U> & ) noexcept {}
@@ -81,10 +81,10 @@ class mmap_allocator {
     void deallocate ( T * ptr_, size_type ) { nodes.erase ( nodes.get_iterator_from_pointer ( ( uninitialized_type * ) ptr_ ) ); }
 
 #if ( __cplusplus >= 201703L ) // C++17
-    [[nodiscard]] T * allocate ( size_type count ) {
+    [[nodiscard]] T * allocate ( size_type size_ ) {
         return static_cast<T *> ( ( void * ) &*( mmap_allocator::nodes.emplace ( ) ) );
     }
-    [[nodiscard]] T * allocate ( size_type count, void const * ) { return allocate ( count ); }
+    [[nodiscard]] T * allocate ( size_type size_, void const * ) { return allocate ( size_ ); }
 #else
     [[nodiscard]] pointer allocate ( size_type, void const * = 0 ) {
         return static_cast<pointer> ( ( void * ) &*( mmap_allocator::nodes.emplace ( ) ) );
@@ -98,21 +98,21 @@ class mmap_allocator {
     using is_always_equal                        = std::true_type;
 
     template<class U, class... Args>
-    void construct ( U * p, Args &&... args ) {
-        ::new ( p ) U ( std::forward<Args> ( args )... );
+    void construct ( U * p_, Args &&... args ) {
+        ::new ( p_ ) U ( std::forward<Args> ( args )... );
     }
     template<class U>
-    void destroy ( U * p ) noexcept {
-        p->~U ( );
+    void destroy ( U * p_ ) noexcept {
+        p_->~U ( );
     }
 #else
-    void construct ( pointer p, value_type const & val ) { ::new ( p ) value_type ( val ); }
-    void destroy ( pointer p ) { p->~value_type ( ); }
+    void construct ( pointer p_, value_type const & val ) { ::new ( p_ ) value_type ( val ); }
+    void destroy ( pointer p_ ) { p_->~value_type ( ); }
 #endif
 
     size_type max_size ( ) const noexcept { return ( PTRDIFF_MAX / sizeof ( value_type ) ); }
-    pointer address ( reference x ) const { return &x; }
-    const_pointer address ( const_reference x ) const { return &x; }
+    pointer address ( reference x_ ) const { return &x_; }
+    const_pointer address ( const_reference x_ ) const { return &x_; }
 };
 
 template<typename T, template<typename> typename Allocator>
