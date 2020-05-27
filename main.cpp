@@ -92,6 +92,23 @@ int main768 ( ) {
     constexpr std::size_t N = 1'000;
 
     {
+        std::vector<std::size_t, win_allocator<std::size_t>> vctr;
+
+        std::size_t result = 0;
+
+        std::uint64_t duration;
+        plf::nanotimer timer;
+        timer.start ( );
+
+        for ( std::size_t i = 0; i < N; ++i )
+            result = vctr.emplace_back ( i );
+
+        duration = static_cast<std::uint64_t> ( timer.get_elapsed_us ( ) );
+        std::cout << std::dec << duration << " us " << result << nl;
+    }
+
+    /*
+    {
         std::set<std::size_t> set;
         std::size_t result = 0;
 
@@ -135,7 +152,7 @@ int main768 ( ) {
         duration = static_cast<std::uint64_t> ( timer.get_elapsed_us ( ) );
         std::cout << std::dec << duration << " us " << result << nl;
     }
-
+    */
     return EXIT_SUCCESS;
 }
 
@@ -144,7 +161,6 @@ struct Foo {
     Type m_member;
 };
 
-// Template template class
 template<template<typename Type> class TemplateType>
 struct Bar {
     TemplateType<int> m_ints;
@@ -155,34 +171,14 @@ struct Baz {
     TemplateTemplateType<Foo> m_foos;
 };
 
-typedef Baz<Bar> Example;
+using Example = Baz<Bar>;
 
-[[nodiscard]] HEDLEY_ALWAYS_INLINE std::size_t round_up_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
-    n_ += multiple_;
-    n_ -= 1;
-    n_ /= multiple_;
-    n_ *= multiple_;
-    return n_;
-}
+int main980780 ( ) {
 
-[[nodiscard]] HEDLEY_ALWAYS_INLINE void * round_up_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
-    std::size_t p;
-    std::memcpy ( &p, &pointer_, sizeof ( std::size_t ) );
-    p = round_up_multiple ( p, multiple_ );
-    std::memcpy ( &pointer_, &p, sizeof ( std::size_t ) );
-    return pointer_;
-}
+    Example e;
 
-int main ( ){
+    e.m_foos.m_ints.m_member = 42;
+    std::cout << e.m_foos.m_ints.m_member << nl;
 
-
-    std::size_t a = 656'868'786'787;
-
-    std::cout << &a << nl << round_up_multiple ( &a, 65'536 ) << nl;
-
-  //  Example e;
-  //  e.m_foos.m_ints.m_member = 42;
-  //  std::cout << e.m_foos.m_ints.m_member << nl;
-
-    return 0;
+    return EXIT_SUCCESS;
 }

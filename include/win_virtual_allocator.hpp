@@ -80,17 +80,17 @@ template<typename T, std::size_t SegmentSize = 65'536,
 class alignas ( 32 ) win_allocator {
 
     static constexpr std::size_t windows_minimum_segement_size = 65'536,
-                                 segment_size                  = round_up_multiple ( SegmentSize, windows_minimum_segement_size ),
-                                 capacity_value                = round_up_multiple ( Capacity, segment_size );
+                                 segment_size                  = round_multiple ( SegmentSize, windows_minimum_segement_size ),
+                                 capacity_value                = round_multiple ( Capacity, segment_size );
 
     struct win_virtual_type {
         friend class win_allocator;
 
         static constexpr std::size_t windows_minimum_segement_size = 65'536,
-                                     segment_size   = round_up_multiple ( SegmentSize, windows_minimum_segement_size ),
-                                     capacity_value = round_up_multiple ( Capacity, segment_size );
+                                     segment_size                  = round_multiple ( SegmentSize, windows_minimum_segement_size ),
+                                     capacity_value                = round_multiple ( Capacity, segment_size );
 
-        win_virtual_type ( ) noexcept : allocate_segment_function_pointer{ &win_virtual_type::allocate_initial_segment } { };
+        win_virtual_type ( ) noexcept { allocate_segment_function_pointer = &this->allocate_initial_segment; };
         ~win_virtual_type ( ) {
             if ( begin_pointer ) {
                 VirtualFree ( begin_pointer, 0, MEM_RELEASE );
@@ -111,12 +111,12 @@ class alignas ( 32 ) win_allocator {
         std::size_t reserved = 0, committed = 0;
 
         private:
-        void * ( *allocate_segment_function_pointer ) ( );
+        void ( *allocate_segment_function_pointer ) ( );
 
         void allocate_initial_segment ( ) {
             begin_pointer = end_pointer       = VirtualAlloc ( nullptr, capacity_value, MEM_RESERVE, PAGE_READWRITE );
             allocate_segment_function_pointer = &win_virtual_type::allocate_regular_segment;
-            allocate_regular ( );
+            allocate_regular_segment ( );
         }
 
         void allocate_regular_segment ( ) {
@@ -189,21 +189,22 @@ class alignas ( 32 ) win_allocator {
     const_pointer address ( const_reference x_ ) const { return &x_; }
 
     private:
-    [[nodiscard]] HEDLEY_ALWAYS_INLINE constexpr std::size_t round_multiple ( std::size_t n_ ) noexcept {
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE static constexpr std::size_t round_multiple ( std::size_t n_ ) noexcept {
         n_ += segment_size - 1;
         n_ /= segment_size;
         n_ *= segment_size;
         return n_;
     }
 
-    [[nodiscard]] HEDLEY_ALWAYS_INLINE constexpr std::size_t round_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE static constexpr std::size_t round_multiple ( std::size_t n_,
+                                                                                     std::size_t multiple_ ) noexcept {
         n_ += multiple_ - 1;
         n_ /= multiple_;
         n_ *= multiple_;
         return n_;
     }
 
-    [[nodiscard]] HEDLEY_ALWAYS_INLINE void * round_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE static void * round_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
         std::size_t p;
         std::memcpy ( &p, &pointer_, sizeof ( std::size_t ) );
         p = round_multiple ( p, multiple_ );
