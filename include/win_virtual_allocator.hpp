@@ -76,39 +76,43 @@
 
 #include <plf/plf_colony.h>
 
-template<typename T, std::size_t Capacity = 65'536>
+template<typename T, std::size_t BlockSize = 65'536,
+         std::size_t Capacity =
+             1'024 * BlockSize> // An allocator that has reserved a region of 64MB and allocates up to a maximum of 1'024 segments.
 class win_allocator {
 
-    struct win_virtual {
+    struct win_virtual_type {
+        friend class win_allocator;
 
-        win_virtual ( ) noexcept : allocate_fp{ &win_virtual::allocate_initial } { };
-        ~win_virtual ( ) {
+        win_virtual_type ( ) noexcept : allocate_fp{ &win_virtual_type::allocate_initial } { };
+        ~win_virtual_type ( ) {
             if ( base_pointer )
                 free ( base_pointer, committed );
         }
 
         void * allocate ( std::size_t size_ ) { return *allocate_fp ( std::forward<std::size_t> ( size_ ) ); }
 
-        void * base_pointer = nullptr;
-        void * ( *allocate_fp ) ( std::size_t );
+        void * base_pointer  = nullptr;
         std::size_t reserved = 0, committed = 0;
 
         private:
-        [[nodiscard]] void * allocate_initial ( std::size_t size_ ) {
+        void * ( *allocate_fp ) ( std::size_t );
+
+        [[nodiscard]] void * allocate_initial ( std::size_t size_ ) {                       // size_ is capacity in the container
             base_pointer = VirtualAlloc ( nullptr, Capacity, MEM_RESERVE, PAGE_READWRITE ); // reserve
-            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + committed, size_, MEM_COMMIT,
-                                                      PAGE_READWRITE ) ) )
+            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size - committed, size_,
+                                                      MEM_COMMIT, PAGE_READWRITE ) ) )
                 throw std::bad_alloc ( );
-            committed += size_;
-            allocate_fp = &win_virtual::allocate_regular;
+            committed   = size_;
+            allocate_fp = &win_virtual_type::allocate_regular;
             return std::forward<void *> ( base_pointer );
         }
 
         [[nodiscard]] void * allocate_regular ( std::size_t size_ ) {
-            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + committed, size_, MEM_COMMIT,
-                                                      PAGE_READWRITE ) ) )
+            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size_ - committed, size_,
+                                                      MEM_COMMIT, PAGE_READWRITE ) ) )
                 throw std::bad_alloc ( );
-            committed += size_;
+            committed = size_;
             return std::forward<void *> ( base_pointer );
         }
 
@@ -118,23 +122,12 @@ class win_allocator {
         }
     };
 
-    win_virtual data;
+    friend struct win_virtual_type;
+
+    win_virtual_type data;
 
     template<typename U>
-    struct uninitialized_value_type {
-        using value_type = U;
-        alignas ( value_type ) char _[ sizeof ( value_type ) ];
-        uninitialized_value_type ( ) noexcept                                  = default;
-        uninitialized_value_type ( uninitialized_value_type const & ) noexcept = default;
-        uninitialized_value_type ( uninitialized_value_type && ) noexcept      = default;
-        [[nodiscard]] uninitialized_value_type & operator= ( uninitialized_value_type const & ) noexcept = default;
-        [[nodiscard]] uninitialized_value_type & operator= ( uninitialized_value_type && ) noexcept = default;
-    };
-
-    using uninitialized_type = uninitialized_value_type<T>;
-
-    template<typename U>
-    using allocator_type = Allocator<U>;
+    using allocator_type = win_allocator<U>;
     using allocator      = allocator_type<T>;
 
     using colony_container = plf::colony<uninitialized_type, typename allocator::template rebind<uninitialized_type>::other>;
@@ -202,9 +195,6 @@ class win_allocator {
         return ( ( n_ + multiple_ - 1 ) / multiple_ ) * multiple_;
     }
 };
-
-template<typename T, template<typename> typename Allocator>
-typename win_allocator<T, Allocator>::colony_container win_allocator<T, Allocator>::nodes;
 
 template<class T1, class T2>
 bool operator== ( const win_allocator<T1> &, const win_allocator<T2> & ) noexcept {
