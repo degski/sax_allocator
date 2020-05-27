@@ -126,11 +126,3 @@ template<class T1, class T2>
 bool operator!= ( const mmap_allocator<T1> &, const mmap_allocator<T2> & ) noexcept {
     return false;
 }
-
-#define USE_MIMALLOC_LTO 1
-#include <mimalloc.h>
-
-template<typename T>
-using mi_mmap_allocator = mmap_allocator<T, mi_stl_allocator>;
-template<typename T>
-using stl_mmap_allocator = mmap_allocator<T, std::allocator>;
