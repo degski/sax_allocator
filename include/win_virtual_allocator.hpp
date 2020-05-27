@@ -102,18 +102,14 @@ class win_allocator {
         private:
         void * ( *allocate_fp ) ( std::size_t );
 
-        [[nodiscard]] void * allocate_initial ( std::size_t size_ ) {                       // size_ is capacity in the container
-            base_pointer = VirtualAlloc ( nullptr, Capacity, MEM_RESERVE, PAGE_READWRITE ); // reserve
-            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size - committed, size_,
-                                                      MEM_COMMIT, PAGE_READWRITE ) ) )
-                throw std::bad_alloc ( );
-            committed   = size_;
-            allocate_fp = &win_virtual_type::allocate_regular;
-            return std::forward<void *> ( base_pointer );
+        [[nodiscard]] void * allocate_initial ( std::size_t size_ ) {
+            base_pointer = VirtualAlloc ( nullptr, Capacity, MEM_RESERVE, PAGE_READWRITE );
+            allocate_fp  = &win_virtual_type::allocate_regular;
+            return allocate_regular ( std::forward<std::size_t> ( size_ ) );
         }
 
         [[nodiscard]] void * allocate_regular ( std::size_t size_ ) {
-            if ( HEDLEY_UNLIKELY ( not base_pointer or not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size_ - committed, size_,
+            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( base_pointer ) + size_ - committed, size_,
                                                       MEM_COMMIT, PAGE_READWRITE ) ) )
                 throw std::bad_alloc ( );
             committed = size_;
