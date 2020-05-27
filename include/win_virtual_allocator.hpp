@@ -75,9 +75,13 @@
 #include <utility>
 
 template<typename T, std::size_t SegmentSize = 65'536,
-         std::size_t Capacity = 1'024 * SegmentSize> // An allocator that has reserved a region of 64MB and allocates up to a
-                                                     // maximum of 1'024 segments.
+         std::size_t Capacity = 1'024 * SegmentSize> // An allocator that reserves a region of 64MB and allocates up to a
+                                                     // maximum of 1'024 segments of 64KB.
 class alignas ( 32 ) win_allocator {
+
+    static constexpr std::size_t windows_minimum_segement_size = 65'536,
+                                 segment_size                  = round_up_multiple ( SegmentSize, windows_minimum_segement_size ),
+                                 capacity_value                = round_up_multiple ( Capacity, segment_size );
 
     struct win_virtual_type {
         friend class win_allocator;
@@ -185,18 +189,24 @@ class alignas ( 32 ) win_allocator {
     const_pointer address ( const_reference x_ ) const { return &x_; }
 
     private:
-    [[nodiscard]] HEDLEY_ALWAYS_INLINE std::size_t round_up_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
-        n_ += multiple_;
-        n_ -= 1;
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE constexpr std::size_t round_multiple ( std::size_t n_ ) noexcept {
+        n_ += segment_size - 1;
+        n_ /= segment_size;
+        n_ *= segment_size;
+        return n_;
+    }
+
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE constexpr std::size_t round_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
+        n_ += multiple_ - 1;
         n_ /= multiple_;
         n_ *= multiple_;
         return n_;
     }
 
-    [[nodiscard]] HEDLEY_ALWAYS_INLINE void * round_up_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
+    [[nodiscard]] HEDLEY_ALWAYS_INLINE void * round_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
         std::size_t p;
         std::memcpy ( &p, &pointer_, sizeof ( std::size_t ) );
-        p = round_up_multiple ( p, multiple_ );
+        p = round_multiple ( p, multiple_ );
         std::memcpy ( &pointer_, &p, sizeof ( std::size_t ) );
         return pointer_;
     }

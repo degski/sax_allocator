@@ -178,7 +178,7 @@ int main ( ){
 
     std::size_t a = 656'868'786'787;
 
-    std::cout << a << nl << round_up_multiple ( &a, 65'536 ) << nl;
+    std::cout << &a << nl << round_up_multiple ( &a, 65'536 ) << nl;
 
   //  Example e;
   //  e.m_foos.m_ints.m_member = 42;
