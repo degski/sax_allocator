@@ -87,7 +87,7 @@ using mi_plf_set = std::set<T, C, mi_colony_node_allocator<T>>;
 template<typename T, typename C = std::less<T>>
 using stl_plf_set = std::set<T, C, stl_colony_node_allocator<T>>;
 
-int main768 ( ) {
+int main ( ) {
 
     constexpr std::size_t N = 1'000;
 
