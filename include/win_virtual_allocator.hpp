@@ -113,25 +113,23 @@ class alignas ( 32 ) win_allocator {
         void *begin_pointer = nullptr, *end_pointer = nullptr;
         std::size_t reserved = 0, committed = 0;
 
-        struct functionoid {
+        struct allocate_segment_functionoid {
             virtual void operator( ) ( win_virtual_type & ) = 0;
-            virtual ~functionoid ( )                        = 0;
+            virtual ~allocate_segment_functionoid ( )       = 0;
         };
 
-        struct allocate_initial_segment : public functionoid {
-            virtual void operator( ) ( win_virtual_type & this_ ) { this_.allocate_initial_segment_implementation ( ); }
+        struct allocate_initial_segment : public allocate_segment_functionoid {
+            virtual void operator( ) ( win_virtual_type * this_ ) { this_->allocate_initial_segment_implementation ( ); }
         };
-        struct allocate_regular_segment : public functionoid {
-            virtual void operator( ) ( win_virtual_type & this_ ) { this_.allocate_regular_segment_implementation ( ); }
+        struct allocate_regular_segment : public allocate_segment_functionoid {
+            virtual void operator( ) ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
         };
 
-        using functionoid_pointer              = functionoid *;
-        using allocate_initial_segment_pointer = allocate_initial_segment *;
-        using allocate_regular_segment_pointer = allocate_regular_segment *;
+        using functionoid_pointer = allocate_segment_functionoid *;
 
         allocate_initial_segment initial;
         allocate_regular_segment regular;
-        functionoid_pointer f[ 2 ] = { &initial, &regular };
+        functionoid_pointer allocate_segment = &initial;
 
         static constexpr std::size_t segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
 
@@ -147,12 +145,13 @@ class alignas ( 32 ) win_allocator {
             if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                       reinterpret_cast<char *> ( begin_pointer ) + committed,
                                   false, 1.0 - static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) )
-                ;
+                allocate_segment->operator( ) ( this );
             return begin_pointer;
         }
 
         void allocate_initial_segment_implementation ( ) {
             begin_pointer = end_pointer = VirtualAlloc ( nullptr, capacity_value, MEM_RESERVE, PAGE_READWRITE );
+            allocate_segment            = &regular;
             allocate_regular_segment_implementation ( );
         }
         void allocate_regular_segment_implementation ( ) {
@@ -226,7 +225,8 @@ class alignas ( 32 ) win_allocator {
 };
 
 template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-inline win_allocator<T, SegmentSize, Capacity>::win_virtual_type::functionoid::~functionoid ( ){ };
+inline win_allocator<T, SegmentSize,
+                     Capacity>::win_virtual_type::allocate_segment_functionoid::~allocate_segment_functionoid ( ){ };
 
 template<class T1, class T2>
 bool operator== ( const win_allocator<T1> &, const win_allocator<T2> & ) noexcept {
