@@ -125,11 +125,12 @@ class alignas ( 32 ) win_allocator {
             virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
         };
 
-        using functionoid_pointer = allocate_segment_functionoid *;
+        using allocate_functionoid = allocate_segment_functionoid *;
 
         static allocate_initial_segment initial;
         static allocate_regular_segment regular;
-        functionoid_pointer segment = &win_virtual_type::initial;
+
+        allocate_functionoid segment = &win_virtual_type::initial;
 
         static constexpr std::size_t segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
 
