@@ -119,17 +119,17 @@ class alignas ( 32 ) win_allocator {
         };
 
         struct allocate_initial_segment : public allocate_segment_functionoid {
-            virtual void operator( ) ( win_virtual_type * this_ ) { this_->allocate_initial_segment_implementation ( ); }
+            virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_initial_segment_implementation ( ); }
         };
         struct allocate_regular_segment : public allocate_segment_functionoid {
-            virtual void operator( ) ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
+            virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
         };
 
         using functionoid_pointer = allocate_segment_functionoid *;
 
-        allocate_initial_segment initial;
-        allocate_regular_segment regular;
-        functionoid_pointer allocate_segment = &initial;
+        static allocate_initial_segment initial;
+        static allocate_regular_segment regular;
+        functionoid_pointer segment = &win_virtual_type::initial;
 
         static constexpr std::size_t segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
 
@@ -145,13 +145,13 @@ class alignas ( 32 ) win_allocator {
             if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                       reinterpret_cast<char *> ( begin_pointer ) + committed,
                                   false, 1.0 - static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) )
-                allocate_segment->operator( ) ( this );
+                segment->allocate ( this );
             return begin_pointer;
         }
 
         void allocate_initial_segment_implementation ( ) {
             begin_pointer = end_pointer = VirtualAlloc ( nullptr, capacity_value, MEM_RESERVE, PAGE_READWRITE );
-            allocate_segment            = &regular;
+            segment                     = &win_virtual_type::regular;
             allocate_regular_segment_implementation ( );
         }
         void allocate_regular_segment_implementation ( ) {
