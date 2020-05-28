@@ -107,21 +107,31 @@ class alignas ( 32 ) win_allocator {
                                  capacity_value = win_allocator::round_multiple ( Capacity, segment_size );
 
     struct win_virtual_type {
+
         friend class win_allocator;
 
+        void *begin_pointer = nullptr, *end_pointer = nullptr;
+        std::size_t reserved = 0, committed = 0;
+
         struct functionoid {
-            virtual void operator( ) ( ) = 0;
-            virtual ~functionoid ( )     = 0;
+            virtual void operator( ) ( win_virtual_type & ) = 0;
+            virtual ~functionoid ( )                        = 0;
         };
 
         struct allocate_initial_segment : public functionoid {
-            virtual void operator( ) ( ) { allocate_initial_segment_implementation ( ); }
+            virtual void operator( ) ( win_virtual_type & this_ ) { this_.allocate_initial_segment_implementation ( ); }
         };
         struct allocate_regular_segment : public functionoid {
-            virtual void operator( ) ( ) { allocate_regular_segment_implementation ( ); }
+            virtual void operator( ) ( win_virtual_type & this_ ) { this_.allocate_regular_segment_implementation ( ); }
         };
 
-        using functionoid_pointer = functionoid *;
+        using functionoid_pointer              = functionoid *;
+        using allocate_initial_segment_pointer = allocate_initial_segment *;
+        using allocate_regular_segment_pointer = allocate_regular_segment *;
+
+        allocate_initial_segment initial;
+        allocate_regular_segment regular;
+        functionoid_pointer f[ 2 ] = { &initial, &regular };
 
         static constexpr std::size_t segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
 
@@ -141,10 +151,6 @@ class alignas ( 32 ) win_allocator {
             return begin_pointer;
         }
 
-        void *begin_pointer = nullptr, *end_pointer = nullptr;
-        std::size_t reserved = 0, committed = 0;
-
-        private:
         void allocate_initial_segment_implementation ( ) {
             begin_pointer = end_pointer = VirtualAlloc ( nullptr, capacity_value, MEM_RESERVE, PAGE_READWRITE );
             allocate_regular_segment_implementation ( );
