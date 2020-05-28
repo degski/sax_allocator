@@ -89,12 +89,12 @@ using stl_plf_set = std::set<T, C, stl_colony_node_allocator<T>>;
 
 int main ( ) {
 
-    constexpr std::size_t N = 1'000;
+    constexpr std::size_t N = 100'000;
 
     {
         std::vector<std::size_t, win_allocator<std::size_t>> vctr;
 
-        std::size_t result = 0;
+        std::size_t result = 1;
 
         std::uint64_t duration;
         plf::nanotimer timer;
@@ -110,7 +110,7 @@ int main ( ) {
     /*
     {
         std::set<std::size_t> set;
-        std::size_t result = 0;
+        std::size_t result = 1;
 
         std::uint64_t duration;
         plf::nanotimer timer;
@@ -125,7 +125,7 @@ int main ( ) {
 
     {
         stl_plf_set<std::size_t> set;
-        std::size_t result = 0;
+        std::size_t result = 1;
 
         std::uint64_t duration;
         plf::nanotimer timer;
@@ -140,7 +140,7 @@ int main ( ) {
 
     {
         mi_plf_set<std::size_t> set;
-        std::size_t result = 0;
+        std::size_t result = 1;
 
         std::uint64_t duration;
         plf::nanotimer timer;

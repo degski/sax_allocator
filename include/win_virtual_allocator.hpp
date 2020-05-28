@@ -74,6 +74,8 @@
 #include <new>
 #include <utility>
 
+#include <sax/iostream.hpp>
+
 template<typename T, std::size_t SegmentSize = 65'536,
          std::size_t Capacity = 1'024 * SegmentSize> // An allocator that reserves a region of 64MB and allocates up to a
                                                      // maximum of 1'024 segments of 64KB.
@@ -145,8 +147,11 @@ class alignas ( 32 ) win_allocator {
         [[nodiscard]] void * allocate ( std::size_t size_ ) {
             if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                       reinterpret_cast<char *> ( begin_pointer ) + committed,
-                                  true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) )
+                                  true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) ) {
                 segment->operator( ) ( this );
+                std::cout << committed << nl;
+            }
+
             return begin_pointer;
         }
 
@@ -196,8 +201,7 @@ class alignas ( 32 ) win_allocator {
     [[nodiscard]] T * allocate ( size_type size_ ) { return static_cast<T *> ( data.allocate ( size_ * sizeof ( T ) ) ); }
     [[nodiscard]] T * allocate ( size_type size_, void const * ) { return allocate ( size_ ); }
 #else
-    [[nodiscard]] pointer allocate ( size_type, void const * = 0 ) {
-        return static_cast<pointer> ( return data.allocate ( size_ * sizeof ( T ) ) );
+    [[nodiscard]] T *  allocate ( size_type size_, void const * = 0 ) { return static_cast<T *> ( data.allocate ( size_ * sizeof ( T ) ) );
     }
 #endif
 
