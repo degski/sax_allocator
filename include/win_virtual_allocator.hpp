@@ -145,7 +145,7 @@ class alignas ( 32 ) win_allocator {
         [[nodiscard]] void * allocate ( std::size_t size_ ) {
             if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                       reinterpret_cast<char *> ( begin_pointer ) + committed,
-                                  false, 1.0 - static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) )
+                                  true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) )
                 segment->operator( ) ( this );
             return begin_pointer;
         }
