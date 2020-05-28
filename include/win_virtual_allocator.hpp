@@ -114,21 +114,21 @@ class alignas ( 32 ) win_allocator {
         std::size_t reserved = 0, committed = 0;
 
         struct allocate_segment_functionoid {
-            virtual void operator( ) ( win_virtual_type * ) = 0;
-            virtual ~allocate_segment_functionoid ( )       = 0;
+            virtual void allocate ( win_virtual_type * ) = 0;
+            virtual ~allocate_segment_functionoid ( )    = 0;
         };
 
-        struct allocate_initial_segment : public allocate_segment_functionoid {
+        struct allocate_initial_segment_functionoid : public allocate_segment_functionoid {
             virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_initial_segment_implementation ( ); }
         };
-        struct allocate_regular_segment : public allocate_segment_functionoid {
+        struct allocate_regular_segment_functionoid : public allocate_segment_functionoid {
             virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
         };
 
         using allocate_functionoid = allocate_segment_functionoid *;
 
-        static allocate_initial_segment initial;
-        static allocate_regular_segment regular;
+        static allocate_initial_segment_functionoid initial;
+        static allocate_regular_segment_functionoid regular;
 
         allocate_functionoid segment = &win_virtual_type::initial;
 
@@ -228,6 +228,14 @@ class alignas ( 32 ) win_allocator {
 template<typename T, std::size_t SegmentSize, std::size_t Capacity>
 inline win_allocator<T, SegmentSize,
                      Capacity>::win_virtual_type::allocate_segment_functionoid::~allocate_segment_functionoid ( ){ };
+
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+typename win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_initial_segment_functionoid
+    win_allocator<T, SegmentSize, Capacity>::win_virtual_type::initial;
+
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+typename win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_regular_segment_functionoid
+    win_allocator<T, SegmentSize, Capacity>::win_virtual_type::regular;
 
 template<class T1, class T2>
 bool operator== ( const win_allocator<T1> &, const win_allocator<T2> & ) noexcept {
