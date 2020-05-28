@@ -113,24 +113,24 @@ class alignas ( 32 ) win_allocator {
         void *begin_pointer = nullptr, *end_pointer = nullptr;
         std::size_t reserved = 0, committed = 0;
 
-        struct allocate_segment_funct {
-            virtual void allocate ( win_virtual_type * ) = 0;
-            virtual ~allocate_segment_funct ( )          = 0;
+        struct allocate_segment_functionoid {
+            virtual void operator( ) ( win_virtual_type * ) = 0;
+            virtual ~allocate_segment_functionoid ( )       = 0;
         };
 
-        struct allocate_initial_segment_funct : public allocate_segment_funct {
-            virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_initial_segment_implementation ( ); }
+        struct allocate_initial_segment_functionoid : public allocate_segment_functionoid {
+            virtual void operator( ) ( win_virtual_type * this_ ) { this_->allocate_initial_segment_implementation ( ); }
         };
-        struct allocate_regular_segment_funct : public allocate_segment_funct {
-            virtual void allocate ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
+        struct allocate_regular_segment_functionoid : public allocate_segment_functionoid {
+            virtual void operator( ) ( win_virtual_type * this_ ) { this_->allocate_regular_segment_implementation ( ); }
         };
 
-        using allocate_funct = allocate_segment_funct *;
+        using allocate_functionoid = allocate_segment_functionoid *;
 
-        static allocate_initial_segment_funct initial;
-        static allocate_regular_segment_funct regular;
+        static allocate_initial_segment_functionoid initial;
+        static allocate_regular_segment_functionoid regular;
 
-        allocate_funct segment = &win_virtual_type::initial;
+        allocate_functionoid segment = &win_virtual_type::initial;
 
         static constexpr std::size_t segment_size = win_allocator::segment_size, capacity_value = win_allocator::capacity_value;
 
@@ -146,7 +146,7 @@ class alignas ( 32 ) win_allocator {
             if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                       reinterpret_cast<char *> ( begin_pointer ) + committed,
                                   false, 1.0 - static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) )
-                segment->allocate ( this );
+                segment->operator( ) ( this );
             return begin_pointer;
         }
 
@@ -186,9 +186,9 @@ class alignas ( 32 ) win_allocator {
     };
 
     win_allocator ( ) noexcept                       = default;
-    win_allocator ( const win_allocator & ) noexcept = default;
+    win_allocator ( win_allocator const & ) noexcept = default;
     template<class U>
-    win_allocator ( const win_allocator<U> & ) noexcept {}
+    win_allocator ( win_allocator<U> const & ) noexcept {}
 
     void deallocate ( T *, size_type ) noexcept { return; }
 
@@ -226,14 +226,15 @@ class alignas ( 32 ) win_allocator {
 };
 
 template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-inline win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_segment_funct::~allocate_segment_funct ( ){ };
+inline win_allocator<T, SegmentSize,
+                     Capacity>::win_virtual_type::allocate_segment_functionoid::~allocate_segment_functionoid ( ){ };
 
 template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-typename win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_initial_segment_funct
+typename win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_initial_segment_functionoid
     win_allocator<T, SegmentSize, Capacity>::win_virtual_type::initial;
 
 template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-typename win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_regular_segment_funct
+typename win_allocator<T, SegmentSize, Capacity>::win_virtual_type::allocate_regular_segment_functionoid
     win_allocator<T, SegmentSize, Capacity>::win_virtual_type::regular;
 
 template<class T1, class T2>
