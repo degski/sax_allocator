@@ -114,7 +114,7 @@ class alignas ( 32 ) win_allocator {
         std::size_t reserved = 0, committed = 0;
 
         struct allocate_segment_functionoid {
-            virtual void operator( ) ( win_virtual_type & ) = 0;
+            virtual void operator( ) ( win_virtual_type * ) = 0;
             virtual ~allocate_segment_functionoid ( )       = 0;
         };
 
