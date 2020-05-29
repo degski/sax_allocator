@@ -89,10 +89,19 @@ using stl_plf_set = std::set<T, C, stl_colony_node_allocator<T>>;
 
 int main ( ) {
 
-    constexpr std::size_t N = 100'000;
+    constexpr std::size_t N = 10'000;
 
     {
-        std::vector<std::size_t, win_allocator<std::size_t>> vctr;
+        constexpr std::size_t SegmentSize = 65'536, Capacity = 1'024 * SegmentSize;
+
+        std::vector<std::size_t, win_allocator<std::size_t, SegmentSize, Capacity>> vctr;
+        // std::vector<std::size_t, std::allocator<std::size_t>> vctr;
+
+        std::cout << "vec constructed" << nl;
+
+        vctr.reserve ( Capacity );
+
+        std::cout << "vec reserved" << nl;
 
         std::size_t result = 1;
 
