@@ -109,18 +109,18 @@ class alignas ( 32 ) win_allocator {
                                  capacity_value                = round_multiple ( Capacity, segment_size );
 
     struct allocate_base_functionoid {
-        virtual void * operator( ) ( void * this_ ) = 0;
-        virtual ~allocate_base_functionoid ( )      = 0;
+        virtual void * operator( ) ( )         = 0;
+        virtual ~allocate_base_functionoid ( ) = 0;
     };
 
     struct initiate_functionoid : public allocate_base_functionoid {
-        virtual void * operator( ) ( void * this_ ) { return this_->do_initiate_implementation ( ); }
+        virtual void * operator( ) ( ) { return do_initiate_implementation ( ); }
     };
     struct reserve_functionoid : public allocate_base_functionoid {
-        virtual void * operator( ) ( void * this_ ) { return this_->do_reserved_implementation ( ); }
+        virtual void * operator( ) ( ) { return do_reserved_implementation ( ); }
     };
     struct allocate_functionoid : public allocate_base_functionoid {
-        virtual void * operator( ) ( void * this_ ) { return this_->do_allocate_implementation ( ); }
+        virtual void * operator( ) ( ) { return do_allocate_implementation ( ); }
     };
 
     [[nodiscard]] void * do_initiate_implementation ( ) noexcept {
@@ -153,7 +153,7 @@ class alignas ( 32 ) win_allocator {
         if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                   reinterpret_cast<char *> ( begin_pointer ) + committed,
                               true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) ) {
-            mode->operator( ) ( this ); // call do_allocate_implementation
+            mode->operator( ) ( ); // call do_allocate_implementation
         }
         return begin_pointer;
     }
