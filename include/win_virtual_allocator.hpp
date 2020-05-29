@@ -70,6 +70,7 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include <functional>
 #include <memory>
 #include <new>
 #include <utility>
@@ -79,8 +80,17 @@
 template<typename T, std::size_t SegmentSize = 65'536,
          std::size_t Capacity = 1'024 * SegmentSize> // An allocator that reserves a region of 64MB and allocates up to a
                                                      // maximum of 1'024 segments of 64KB.
-class alignas ( 32 ) win_allocator {
+struct alignas ( 32 ) win_allocator {
 
+    using value_type      = T;
+    using size_type       = std::size_t;
+    using difference_type = std::ptrdiff_t;
+    using reference       = value_type &;
+    using const_reference = value_type const &;
+    using pointer         = value_type *;
+    using const_pointer   = value_type const *;
+
+    private:
     [[nodiscard]] HEDLEY_ALWAYS_INLINE static constexpr std::size_t round_multiple ( std::size_t n_ ) noexcept {
         n_ += segment_size - 1;
         n_ /= segment_size;
@@ -108,50 +118,40 @@ class alignas ( 32 ) win_allocator {
                                  segment_size                  = round_multiple ( SegmentSize, windows_minimum_segement_size ),
                                  capacity_value                = round_multiple ( Capacity, segment_size );
 
-    struct allocate_base_functionoid {
-        virtual void * operator( ) ( )         = 0;
-        virtual ~allocate_base_functionoid ( ) = 0;
+    using allocate_function_type = std::function<void *( size_type )>;
+
+    struct do_base_functionoid {
+        virtual void * operator( ) ( size_type ) = 0;
+        virtual ~do_base_functionoid ( )         = 0;
     };
 
-    struct initiate_functionoid : public allocate_base_functionoid {
-        virtual void * operator( ) ( ) { return do_initiate_implementation ( ); }
+    struct do_functionoid : public do_base_functionoid {
+        allocate_function_type it;
+        virtual void * operator( ) ( size_type size_ ) { return it ( size_ ); }
+        template<typename Lda>
+        do_functionoid ( Lda it_ ) : it ( std::move ( it_ ) ) {}
     };
-    struct reserve_functionoid : public allocate_base_functionoid {
-        virtual void * operator( ) ( ) { return do_reserved_implementation ( ); }
-    };
-    struct allocate_functionoid : public allocate_base_functionoid {
-        virtual void * operator( ) ( ) { return do_allocate_implementation ( ); }
-    };
-
-    using allocate_functionoid_pointer = allocate_base_functionoid *;
-
-    static initiate_functionoid initiate;
-    static reserve_functionoid reserve;
-    static allocate_functionoid allocate_segments;
 
     void *begin_pointer = nullptr, *end_pointer = nullptr;
-    std::size_t committed             = 0;
-    allocate_functionoid_pointer mode = &initiate;
+    std::size_t committed = 0;
+
+    std::unique_ptr<do_functionoid> allocate_implementation_pointer =
+        std::make_unique<do_functionoid> ( [ this ] ( size_type s ) { return initiate_implementation ( s ); } );
 
     public:
+    [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
+        return static_cast<T *> ( allocate_implementation_pointer->operator( ) ( size_ * sizeof ( T ) ) );
+    }
+
     win_allocator ( ) noexcept                       = default;
     win_allocator ( win_allocator const & ) noexcept = default;
     template<class U>
     win_allocator ( win_allocator<U> const & ) noexcept {}
-    ~win_allocator ( ) { do_free_implementation ( ); }
+    ~win_allocator ( ) { allocate_free_implementation ( 0 ); }
 
     template<typename U>
     using allocator_type = win_allocator<U>;
     using allocator      = allocator_type<T>;
-
-    public:
-    using value_type      = T;
-    using size_type       = std::size_t;
-    using difference_type = std::ptrdiff_t;
-    using reference       = value_type &;
-    using const_reference = value_type const &;
-    using pointer         = value_type *;
-    using const_pointer   = value_type const *;
 
     template<class U>
     struct rebind {
@@ -159,18 +159,21 @@ class alignas ( 32 ) win_allocator {
     };
 
     private:
-    [[nodiscard]] void * do_initiate_implementation ( ) {
-        mode = &reserve;
+    [[nodiscard]] void * initiate_implementation ( std::size_t size_ ) {
+        assert ( 2 * sizeof ( void * ) == size_ );
+        allocate_implementation_pointer =
+            std::make_unique<do_functionoid> ( [ this ] ( size_type s ) { return reserved_implementation ( s ); } );
+        return &begin_pointer;
+    }
+
+    [[nodiscard]] void * reserved_implementation ( std::size_t size_ ) {
+        begin_pointer = end_pointer = VirtualAlloc ( nullptr, size_, MEM_RESERVE, PAGE_READWRITE );
+        allocate_implementation_pointer =
+            std::make_unique<do_functionoid> ( [ this ] ( size_type s ) { return allocate_implementation ( s ); } );
         return begin_pointer;
     }
 
-    [[nodiscard]] void * do_reserved_implementation ( ) {
-        begin_pointer = end_pointer = VirtualAlloc ( nullptr, capacity_value, MEM_RESERVE, PAGE_READWRITE );
-        mode                        = &allocate_segments;
-        return begin_pointer;
-    }
-
-    [[nodiscard]] void * do_allocate_implementation ( std::size_t size_ ) {
+    [[nodiscard]] void * allocate_implementation ( std::size_t size_ ) {
         if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                                   reinterpret_cast<char *> ( begin_pointer ) + committed,
                               true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) ) {
@@ -182,7 +185,7 @@ class alignas ( 32 ) win_allocator {
         return begin_pointer;
     }
 
-    void do_free_implementation ( ) {
+    void allocate_free_implementation ( std::size_t ) {
         if ( begin_pointer ) {
             VirtualFree ( begin_pointer, 0, MEM_RELEASE );
             begin_pointer = nullptr, end_pointer = nullptr, committed = 0;
@@ -190,18 +193,14 @@ class alignas ( 32 ) win_allocator {
     }
 
     public:
-    [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
-        return static_cast<T *> ( do_allocate_implementation ( size_ * sizeof ( T ) ) );
-    }
-
     void deallocate ( T *, size_type ) noexcept { return; }
     /*
 #if ( __cplusplus >= 201703L ) // C++17
-    [[nodiscard]] T * allocate ( size_type size_ ) { return static_cast<T *> ( do_allocate ( size_ * sizeof ( T ) ) ); }
+    [[nodiscard]] T * allocate ( size_type size_ ) { return static_cast<T *> ( allocate_allocate ( size_ * sizeof ( T ) ) ); }
     [[nodiscard]] T * allocate ( size_type size_, void const * ) { return allocate ( size_ ); }
 #else
     [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
-        return static_cast<T *> ( do_allocate ( size_ * sizeof ( T ) ) );
+        return static_cast<T *> ( allocate_allocate ( size_ * sizeof ( T ) ) );
     }
 #endif
 */
@@ -230,16 +229,7 @@ class alignas ( 32 ) win_allocator {
 };
 
 template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-inline win_allocator<T, SegmentSize, Capacity>::allocate_base_functionoid::~allocate_base_functionoid ( ){ };
-
-template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-typename win_allocator<T, SegmentSize, Capacity>::initiate_functionoid win_allocator<T, SegmentSize, Capacity>::initiate;
-
-template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-typename win_allocator<T, SegmentSize, Capacity>::reserve_functionoid win_allocator<T, SegmentSize, Capacity>::reserve;
-
-template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-typename win_allocator<T, SegmentSize, Capacity>::allocate_functionoid win_allocator<T, SegmentSize, Capacity>::allocate_segments;
+inline win_allocator<T, SegmentSize, Capacity>::do_base_functionoid::~do_base_functionoid ( ){ };
 
 template<class T1, class T2>
 bool operator== ( const win_allocator<T1> &, const win_allocator<T2> & ) noexcept {
