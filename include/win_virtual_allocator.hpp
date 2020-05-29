@@ -123,7 +123,43 @@ class alignas ( 32 ) win_allocator {
         virtual void * operator( ) ( ) { return do_allocate_implementation ( ); }
     };
 
-    [[nodiscard]] void * do_initiate_implementation ( ) noexcept {
+    using allocate_functionoid_pointer = allocate_base_functionoid *;
+
+    static initiate_functionoid initiate;
+    static reserve_functionoid reserve;
+    static allocate_functionoid allocate_segments;
+
+    void *begin_pointer = nullptr, *end_pointer = nullptr;
+    std::size_t committed             = 0;
+    allocate_functionoid_pointer mode = &initiate;
+
+    public:
+    win_allocator ( ) noexcept                       = default;
+    win_allocator ( win_allocator const & ) noexcept = default;
+    template<class U>
+    win_allocator ( win_allocator<U> const & ) noexcept {}
+    ~win_allocator ( ) { do_free_implementation ( ); }
+
+    template<typename U>
+    using allocator_type = win_allocator<U>;
+    using allocator      = allocator_type<T>;
+
+    public:
+    using value_type      = T;
+    using size_type       = std::size_t;
+    using difference_type = std::ptrdiff_t;
+    using reference       = value_type &;
+    using const_reference = value_type const &;
+    using pointer         = value_type *;
+    using const_pointer   = value_type const *;
+
+    template<class U>
+    struct rebind {
+        using other = win_allocator<U>;
+    };
+
+    private:
+    [[nodiscard]] void * do_initiate_implementation ( ) {
         mode = &reserve;
         return begin_pointer;
     }
@@ -153,45 +189,10 @@ class alignas ( 32 ) win_allocator {
         }
     }
 
+    public:
     [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
         return static_cast<T *> ( do_allocate_implementation ( size_ * sizeof ( T ) ) );
     }
-
-    using allocate_functionoid_pointer = allocate_base_functionoid *;
-
-    static initiate_functionoid initiate;
-    static reserve_functionoid reserve;
-    static allocate_functionoid allocate_segments;
-
-    void *begin_pointer = nullptr, *end_pointer = nullptr;
-    std::size_t committed             = 0;
-    allocate_functionoid_pointer mode = &initiate;
-
-    win_allocator ( ) noexcept = default;
-    ~win_allocator ( ) { do_free_implementation ( ); }
-
-    template<typename U>
-    using allocator_type = win_allocator<U>;
-    using allocator      = allocator_type<T>;
-
-    public:
-    using value_type      = T;
-    using size_type       = std::size_t;
-    using difference_type = std::ptrdiff_t;
-    using reference       = value_type &;
-    using const_reference = value_type const &;
-    using pointer         = value_type *;
-    using const_pointer   = value_type const *;
-
-    template<class U>
-    struct rebind {
-        using other = win_allocator<U>;
-    };
-
-    win_allocator ( ) noexcept                       = default;
-    win_allocator ( win_allocator const & ) noexcept = default;
-    template<class U>
-    win_allocator ( win_allocator<U> const & ) noexcept {}
 
     void deallocate ( T *, size_type ) noexcept { return; }
     /*
