@@ -77,9 +77,9 @@
 
 #include <sax/iostream.hpp>
 
-template<typename T, std::size_t SegmentSize = 65'536,
-         std::size_t Capacity = 1'024 * SegmentSize> // An allocator that reserves a region of 64MB and allocates up to a
-                                                     // maximum of 1'024 segments of 64KB.
+template<typename T, std::size_t SegmentSize = 65'536, std::size_t Capacity = 1'024 * SegmentSize,
+         template<typename> typename StdFunction = std::function> // An allocator that reserves a region of 64MB and allocates up to
+                                                                  // a maximum of 1'024 segments of 64KB.
 struct alignas ( 32 ) win_allocator {
 
     using value_type      = T;
@@ -118,7 +118,7 @@ struct alignas ( 32 ) win_allocator {
                                  segment_size                  = round_multiple ( SegmentSize, windows_minimum_segement_size ),
                                  capacity_value                = round_multiple ( Capacity, segment_size );
 
-    using allocate_function_type = std::function<void *( size_type )>;
+    using allocate_function_type = StdFunction<void *( size_type )>;
 
     struct do_base_functionoid {
         virtual void * operator( ) ( size_type ) = 0;
@@ -126,17 +126,20 @@ struct alignas ( 32 ) win_allocator {
     };
 
     struct do_functionoid : public do_base_functionoid {
-        allocate_function_type it;
-        virtual void * operator( ) ( size_type size_ ) { return it ( size_ ); }
-        template<typename Lda>
-        do_functionoid ( Lda it_ ) : it ( std::move ( it_ ) ) {}
+        allocate_function_type lambda;
+        virtual void * operator( ) ( size_type size_ ) { return lambda ( size_ ); }
+        template<typename Lambda>
+        do_functionoid ( Lambda lambda_ ) : lambda ( std::move ( lambda_ ) ) {}
     };
+
+    // data begin
 
     void *begin_pointer = nullptr, *end_pointer = nullptr;
     std::size_t committed = 0;
-
     std::unique_ptr<do_functionoid> allocate_implementation_pointer =
         std::make_unique<do_functionoid> ( [ this ] ( size_type s ) { return initiate_implementation ( s ); } );
+
+    // data end
 
     public:
     [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
@@ -228,8 +231,8 @@ struct alignas ( 32 ) win_allocator {
     const_pointer address ( const_reference x_ ) const { return &x_; }
 };
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity>
-inline win_allocator<T, SegmentSize, Capacity>::do_base_functionoid::~do_base_functionoid ( ){ };
+template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
+inline win_allocator<T, SegmentSize, Capacity, StdFunction>::do_base_functionoid::~do_base_functionoid ( ){ };
 
 template<class T1, class T2>
 bool operator== ( const win_allocator<T1> &, const win_allocator<T2> & ) noexcept {
