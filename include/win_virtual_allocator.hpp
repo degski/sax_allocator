@@ -134,11 +134,15 @@ class alignas ( 32 ) win_allocator {
         return begin_pointer;
     }
 
-    [[nodiscard]] void * do_allocate_implementation ( ) {
-        if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( begin_pointer ) + committed, segment_size, MEM_COMMIT,
-                                                  PAGE_READWRITE ) ) )
-            throw std::bad_alloc ( );
-        committed += segment_size;
+    [[nodiscard]] void * do_allocate_implementation ( std::size_t size_ ) {
+        if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
+                                  reinterpret_cast<char *> ( begin_pointer ) + committed,
+                              true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) ) {
+            if ( HEDLEY_UNLIKELY ( not VirtualAlloc ( reinterpret_cast<char *> ( begin_pointer ) + committed, segment_size,
+                                                      MEM_COMMIT, PAGE_READWRITE ) ) )
+                throw std::bad_alloc ( );
+            committed += segment_size;
+        }
         return begin_pointer;
     }
 
@@ -149,17 +153,8 @@ class alignas ( 32 ) win_allocator {
         }
     }
 
-    [[nodiscard]] void * allocate_implementation ( std::size_t size_ ) {
-        if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
-                                  reinterpret_cast<char *> ( begin_pointer ) + committed,
-                              true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) ) {
-            mode->operator( ) ( ); // call do_allocate_implementation
-        }
-        return begin_pointer;
-    }
-
     [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
-        return static_cast<T *> ( allocate_implementation ( size_ * sizeof ( T ) ) );
+        return static_cast<T *> ( do_allocate_implementation ( size_ * sizeof ( T ) ) );
     }
 
     using allocate_functionoid_pointer = allocate_base_functionoid *;
