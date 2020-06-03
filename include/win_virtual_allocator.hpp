@@ -78,17 +78,17 @@
 
 #include <sax/iostream.hpp>
 
-template<typename T, std::size_t SegmentSize = 65'536, std::size_t Capacity = 1'024 * SegmentSize,
-         template<typename> typename StdFunction = std::function> // An allocator that reserves a region of 64MB and allocates up to
-                                                                  // a maximum of 1'024 segments of 64KB.
-class alignas ( 32 ) win_allocator {
+template<typename T, std::size_t SegmentSize = 65'536,
+         std::size_t Capacity = 1'024 * SegmentSize> // An allocator that reserves a region of 64MB and allocates up to
+                                                     // a maximum of 1'024 segments of 64KB.
+struct alignas ( 32 ) win_allocator {
 
     [[nodiscard]] HEDLEY_ALWAYS_INLINE static constexpr std::size_t round_multiple ( std::size_t n_ ) noexcept;
     [[nodiscard]] HEDLEY_ALWAYS_INLINE static constexpr std::size_t round_multiple ( std::size_t n_,
                                                                                      std::size_t multiple_ ) noexcept;
     [[nodiscard]] HEDLEY_ALWAYS_INLINE static void * round_multiple ( void * pointer_, std::size_t multiple_ ) noexcept;
 
-    public:
+    // public:
     using value_type      = T;
     using size_type       = std::size_t;
     using difference_type = std::ptrdiff_t;
@@ -97,7 +97,7 @@ class alignas ( 32 ) win_allocator {
     using pointer         = value_type *;
     using const_pointer   = value_type const *;
 
-    private:
+    // private:
     static constexpr std::size_t windows_minimum_segement_size = 65'536,
                                  segment_size                  = round_multiple ( SegmentSize, windows_minimum_segement_size ),
                                  capacity_value                = round_multiple ( Capacity, segment_size );
@@ -108,23 +108,29 @@ class alignas ( 32 ) win_allocator {
 
     void free_implementation ( std::size_t );
 
-    // data begin - 32 bytes
-
     void *begin_pointer = nullptr, *end_pointer = nullptr;
     std::size_t committed                                     = 0;
     void * ( win_allocator::*implementation ) ( std::size_t ) = &win_allocator::initiate_implementation;
 
-    // data end
-
-    public:
-    [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
-        return static_cast<T *> ( std::invoke ( implementation, this, size_ * sizeof ( T ) ) );
+    [[nodiscard]] auto copy_implementation ( win_allocator const & o_ ) noexcept {
+        return o_.implementation == &o_.win_allocator::reserved_implementation
+                   ? &win_allocator::reserved_implementation
+                   : o_.implementation == &o_.win_allocator::initiate_implementation ? &win_allocator::initiate_implementation
+                                                                                     : &win_allocator::allocate_implementation;
     }
 
-    win_allocator ( ) noexcept                       = default;
-    win_allocator ( win_allocator const & ) noexcept = default;
+    // public:
+    win_allocator ( ) noexcept = default;
+
+    win_allocator ( win_allocator && )      = delete;
+    win_allocator ( win_allocator const & ) = delete;
+
+    win_allocator & operator= ( win_allocator const & ) = delete;
+    win_allocator & operator= ( win_allocator && ) = delete;
+
     template<class U>
     win_allocator ( win_allocator<U> const & ) noexcept {}
+
     ~win_allocator ( ) { free_implementation ( 0 ); }
 
     template<typename U>
@@ -136,22 +142,24 @@ class alignas ( 32 ) win_allocator {
         using other = win_allocator<U>;
     };
 
-    void deallocate ( T *, size_type ) noexcept { return; }
-    /*
 #if ( __cplusplus >= 201703L ) // C++17
-    [[nodiscard]] T * allocate ( size_type size_ ) { return static_cast<T *> ( allocate_allocate ( size_ * sizeof ( T ) ) ); }
+    [[nodiscard]] T * allocate ( size_type size_ ) {
+        return static_cast<T *> ( std::invoke ( implementation, this, size_ * sizeof ( T ) ) );
+    }
     [[nodiscard]] T * allocate ( size_type size_, void const * ) { return allocate ( size_ ); }
 #else
     [[nodiscard]] T * allocate ( size_type size_, void const * = 0 ) {
-        return static_cast<T *> ( allocate_allocate ( size_ * sizeof ( T ) ) );
+        return static_cast<T *> ( std::invoke ( implementation, this, size_ * sizeof ( T ) ) );
     }
 #endif
-*/
+
+    void deallocate ( T *, size_type ) noexcept { return; }
+
 #if ( ( __cplusplus >= 201103L ) || ( _MSC_VER > 1900 ) ) // C++11
-    using propagate_on_container_copy_assignment = std::false_type;
+    using propagate_on_container_copy_assignment = std::true_type;
     using propagate_on_container_move_assignment = std::true_type;
     using propagate_on_container_swap            = std::true_type;
-    using is_always_equal                        = std::false_type;
+    using is_always_equal                        = std::true_type;
 
     template<class U, class... Args>
     void construct ( U * p_, Args &&... args ) {
@@ -171,27 +179,25 @@ class alignas ( 32 ) win_allocator {
     const_pointer address ( const_reference x_ ) const { return &x_; }
 };
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-[[nodiscard]] constexpr std::size_t
-win_allocator<T, SegmentSize, Capacity, StdFunction>::round_multiple ( std::size_t n_ ) noexcept {
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+[[nodiscard]] constexpr std::size_t win_allocator<T, SegmentSize, Capacity>::round_multiple ( std::size_t n_ ) noexcept {
     n_ += segment_size - 1;
     n_ /= segment_size;
     n_ *= segment_size;
     return n_;
 }
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-[[nodiscard]] constexpr std::size_t
-win_allocator<T, SegmentSize, Capacity, StdFunction>::round_multiple ( std::size_t n_, std::size_t multiple_ ) noexcept {
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+[[nodiscard]] constexpr std::size_t win_allocator<T, SegmentSize, Capacity>::round_multiple ( std::size_t n_,
+                                                                                              std::size_t multiple_ ) noexcept {
     n_ += multiple_ - 1;
     n_ /= multiple_;
     n_ *= multiple_;
     return n_;
 }
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity, StdFunction>::round_multiple ( void * pointer_,
-                                                                                            std::size_t multiple_ ) noexcept {
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity>::round_multiple ( void * pointer_, std::size_t multiple_ ) noexcept {
     std::size_t p;
     std::memcpy ( &p, &pointer_, sizeof ( std::size_t ) );
     p = round_multiple ( p, multiple_ );
@@ -199,22 +205,29 @@ template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typ
     return pointer_;
 }
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity, StdFunction>::initiate_implementation ( std::size_t size_ ) {
-    assert ( 2 * sizeof ( void * ) == size_ );
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity>::initiate_implementation ( std::size_t size_ ) {
+    std::cout << "initiate" << ' ' << size_ << ' ' << this << nl;
     implementation = &win_allocator::reserved_implementation;
+    // assert ( ( ( 2 * sizeof ( void * ) ) == ( size_ ) ) );
     return &begin_pointer;
 }
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity, StdFunction>::reserved_implementation ( std::size_t size_ ) {
-    begin_pointer = end_pointer = VirtualAlloc ( nullptr, size_, MEM_RESERVE, PAGE_READWRITE );
-    implementation              = &win_allocator::allocate_implementation;
-    return begin_pointer;
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity>::reserved_implementation ( std::size_t size_ ) {
+    std::cout << "reserved" << ' ' << size_ << ' ' << this << nl;
+    // begin_pointer = end_pointer = VirtualAlloc ( nullptr, size_, MEM_RESERVE, PAGE_READWRITE );
+    implementation = &win_allocator::allocate_implementation;
+    // return begin_pointer;
+    // return VirtualAlloc ( nullptr, size_, MEM_RESERVE, PAGE_READWRITE );
+    return nullptr;
 }
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity, StdFunction>::allocate_implementation ( std::size_t size_ ) {
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+[[nodiscard]] void * win_allocator<T, SegmentSize, Capacity>::allocate_implementation ( std::size_t size_ ) {
+    std::cout << "allocate" << ' ' << size_ << nl;
+    return nullptr;
+
     if ( HEDLEY_PREDICT ( ( end_pointer = reinterpret_cast<char *> ( begin_pointer ) + size_ ) >
                               reinterpret_cast<char *> ( begin_pointer ) + committed,
                           true, static_cast<double> ( sizeof ( T ) ) / static_cast<double> ( segment_size ) ) ) {
@@ -226,8 +239,8 @@ template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typ
     return begin_pointer;
 }
 
-template<typename T, std::size_t SegmentSize, std::size_t Capacity, template<typename> typename StdFunction>
-void win_allocator<T, SegmentSize, Capacity, StdFunction>::free_implementation ( std::size_t ) {
+template<typename T, std::size_t SegmentSize, std::size_t Capacity>
+void win_allocator<T, SegmentSize, Capacity>::free_implementation ( std::size_t ) {
     if ( begin_pointer ) {
         VirtualFree ( begin_pointer, 0, MEM_RELEASE );
         begin_pointer = nullptr, end_pointer = nullptr, committed = 0;
