@@ -1167,154 +1167,133 @@ Tesauro, G. (1992) "Practical issues in temporal difference learning,"
 Machine Learning 8: 257-278.
 ************************************************************************/
 
-/* Experimental Parameters: */
+// Experimental Parameters:
 
-int n, num_hidden, m; /* number of inputs, hidden, and output units */
-int MAX_UNITS;        /* maximum total number of units (to set array sizes) */
-int time_steps;       /* number of time steps to simulate */
-float BIAS;           /* strength of the bias (constant input) contribution */
-float ALPHA;          /* 1st layer learning rate (typically 1/n) */
-float BETA;           /* 2nd layer learning rate (typically 1/num_hidden) */
-float GAMMA;          /* discount-rate parameter (typically 0.9) */
-float LAMBDA;         /* trace decay parameter (should be <= gamma) */
+int n, num_hidden, m; // number of inputs, hidden, and output units
+int MAX_UNITS;        // maximum total number of units (to set array sizes)
+int time_steps;       // number of time steps to simulate
 
-/* Network Data Structure: */
+float BIAS;   // strength of the bias (constant input) contribution
+float ALPHA;  // 1st layer learning rate (typically 1/n)
+float BETA;   // 2nd layer learning rate (typically 1/num_hidden)
+float GAMMA;  // discount-rate parameter (typically 0.9)
+float LAMBDA; // trace decay parameter (should be <= gamma)
 
-float x[ time_steps ][ MAX_UNITS ]; /* input data (units) */
-float h[ MAX_UNITS ];               /* hidden layer */
-float y[ MAX_UNITS ];               /* output layer */
-float w[ MAX_UNITS ][ MAX_UNITS ];  /* weights */
+// Network Data Structure:
 
-/* Learning Data Structure: */
+float x[ time_steps ][ MAX_UNITS ]; // input data (units)
+float h[ MAX_UNITS ];               // hidden layer
+float y[ MAX_UNITS ];               // output layer
+float v[ MAX_UNITS ];               // ? layer
+float w[ MAX_UNITS ][ MAX_UNITS ];  // weights */
+
+// Learning Data Structure: */
 
 float old_y[ MAX_UNITS ];
-float ev[ MAX_UNITS ][ MAX_UNITS ][ MAX_UNITS ]; /* hidden trace */
-float ew[ MAX_UNITS ][ MAX_UNITS ];              /* output trace */
-float r[ time_steps ][ MAX_UNITS ];              /* reward */
-float error[ MAX_UNITS ];                        /* TD error */
-int t;                                           /* current time step */
+float ev[ MAX_UNITS ][ MAX_UNITS ][ MAX_UNITS ]; // hidden trace
+float ew[ MAX_UNITS ][ MAX_UNITS ];              // output trace
+float r[ time_steps ][ MAX_UNITS ];              // reward
+float error[ MAX_UNITS ];                        // TD error
+int t;                                           // current time step
 
-main ( )
+int main ( ) {
 
-{
     int k;
+
     init_network ( );
 
-    t = 0;        /* No learning on time step 0 */
-    response ( ); /* Just compute old response (old_y)...*/
-    for ( k = 0; k < m; k++ )
-        old_y[ k ] = y[ k ];
-    update_eligibilities ( ); /* ...and prepare the eligibilities */
+    t = 0;        // no learning on time step 0
+    response ( ); // just compute old response (old_y)
 
-    for ( t = 1; t <= time_steps; t++ ) /* a single pass through time series data */
-    {
-        response ( ); /* forward pass - compute activities */
-        for ( k = 0; k < m; k++ )
-            error[ k ] = r[ t ][ k ] + GAMMA * y[ k ] - old_y[ k ]; /* form errors */
-        td_learn ( );                                                /* backward pass - learning */
-        response ( );                                               /* forward pass must be done twice to form TD errors */
-        for ( k = 0; k < m; k++ )
-            old_y[ k ] = y[ k ]; /* for use in next cycle's TD errors */
-        update_eligibilities ( );          /* update eligibility traces */
-    }                            /* end t */
-} /* end main */
+    for ( k = 0; k < m; ++k ) //
+        old_y[ k ] = y[ k ];  //
 
-/*****
- * init_network()
- *
- * Initialize weights and biases
- *
- *****/
+    update_eligibilities ( ); //...and prepare the eligibilities
 
-void init_network (  ) noexcept {
+    for ( t = 1; t <= time_steps; ++t ) {                           // a single pass through time series data
+        response ( );                                               // forward pass - compute activities
+        for ( k = 0; k < m; ++k )                                   //
+            error[ k ] = r[ t ][ k ] + GAMMA * y[ k ] - old_y[ k ]; // form errors
+        td_learn ( );                                               // backward pass - learning
+        response ( );                                               // forward pass must be done twice to form TD errors
+        for ( k = 0; k < m; ++k )                                   //
+            old_y[ k ] = y[ k ];                                    // for use in next cycle's TD errors
+        update_eligibilities ( );                                   // update eligibility traces
+    }                                                               // end t
 
-    int s, j, k, i;
+    return EXIT_SUCCESS;
+}
 
-    for ( s = 0; s < time_steps; s++ )
+// Initialize weights and biases.
+void init_network ( ) noexcept {
+
+    int i = 0;
+
+    for ( int s = 0; s < time_steps; ++s )
         x[ s ][ n ] = BIAS;
+
     h[ num_hidden ] = BIAS;
-    for ( j = 0; j <= num_hidden; j++ ) {
-        for ( k = 0; k < m; k++ ) {
-            w[ j ][ k ] = some small random value ew[ i ][ k ] = 0.0;
-            old_y[ k ]                                         = 0.0;
+
+    for ( int j = 0; j <= num_hidden; ++j ) {
+        for ( int k = 0; k < m; ++k ) {
+            w[ j ][ k ]  = some_small_random_value;
+            ew[ i ][ k ] = { };
+            old_y[ k ]   = { };
         }
-        for ( i = 0; i <= n; i++ ) {
-            v[ i ][ j ] = some small random value for ( k = 0; k < m; k++ ) { ev[ i ][ j ][ k ] = 0.0; }
+        for ( i = 0; i <= n; ++i ) {
+            v[ i ][ j ] = some_small_random_value;
+            for ( k = 0; k < m; ++k )
+                ev[ i ][ j ][ k ] = { };
         }
     }
-} /* end init_network */
+}
 
-/*****
- * response()
- *
- * Compute hidden layer and output predictions
- *
- *****/
-
+// Compute hidden layer and output predictions.
 void response ( ) noexcept {
-
-    int i, j, k;
 
     h[ num_hidden ] = BIAS;
     x[ t ][ n ]     = BIAS;
 
-    for ( j = 0; j < num_hidden; j++ ) {
-        h[ j ] = 0.0;
-        for ( i = 0; i <= n; i++ ) {
+    for ( int j = 0; j < num_hidden; ++j ) {
+        h[ j ] = { };
+        for ( int i = 0; i <= n; ++i )
             h[ j ] += x[ t ][ i ] * v[ i ][ j ];
-        }
-        h[ j ] = 1.0 / ( 1.0 + exp ( -h[ j ] ) ); /* asymmetric sigmoid */
+        h[ j ] = 1.0f / ( 1.0f + std::exp ( -h[ j ] ) ); // asymmetric sigmoid
     }
-    for ( k = 0; k < m; k++ ) {
-        y[ k ] = 0.0;
-        for ( j = 0; j <= num_hidden; j++ ) {
+
+    for ( int k = 0; k < m; ++k ) {
+        y[ k ] = { };
+        for ( int j = 0; j <= num_hidden; ++j )
             y[ k ] += h[ j ] * w[ j ][ k ];
-        }
-        y[ k ] = 1.0 / ( 1.0 + exp ( -y[ k ] ) ); /* asymmetric sigmoid (OPTIONAL) */
+        y[ k ] = 1.0f / ( 1.0f + std::exp ( -y[ k ] ) ); // asymmetric sigmoid (OPTIONAL)
     }
-} /* end response */
+}
 
-/*****
- * td_learn()
- *
- * Update weight vectors
- *
- *****/
-
+// Update weight vectors.
 void td_learn ( ) noexcept {
 
-    int i, j, k;
-
-    for ( k = 0; k < m; k++ ) {
-        for ( j = 0; j <= num_hidden; j++ ) {
+    for ( int k = 0; k < m; ++k ) {
+        for ( int j = 0; j <= num_hidden; ++j ) {
             w[ j ][ k ] += BETA * error[ k ] * ew[ j ][ k ];
-            for ( i = 0; i <= n; i++ )
+            for ( int i = 0; i <= n; ++i )
                 v[ i ][ j ] += ALPHA * error[ k ] * ev[ i ][ j ][ k ];
         }
     }
-} /* end td_learn */
+}
 
-/*****
- * update_eligibilities()
- *
- * Calculate new weight eligibilities
- *
- *****/
-
+// Calculate new weight eligibilities.
 void update_eligibilities ( ) noexcept {
 
-    int i, j, k;
     float temp[ MAX_UNITS ];
 
-    for ( k = 0; k < m; k++ )
-        temp[ k ] = y[ k ] * ( 1 - y[ k ] );
+    for ( int k = 0; k < m; ++k )
+        temp[ k ] = y[ k ] * ( 1.0f - y[ k ] );
 
-    for ( j = 0; j <= num_hidden; j++ ) {
-        for ( k = 0; k < m; k++ ) {
+    for ( int j = 0; j <= num_hidden; ++j ) {
+        for ( int k = 0; k < m; ++k ) {
             ew[ j ][ k ] = LAMBDA * ew[ j ][ k ] + temp[ k ] * h[ j ];
-            for ( i = 0; i <= n; i++ ) {
-                ev[ i ][ j ][ k ] = LAMBDA * ev[ i ][ j ][ k ] + temp[ k ] * w[ j ][ k ] * h[ j ] * ( 1 - h[ j ] ) * x[ t ][ i ];
-            }
+            for ( int i = 0; i <= n; ++i )
+                ev[ i ][ j ][ k ] = LAMBDA * ev[ i ][ j ][ k ] + temp[ k ] * w[ j ][ k ] * h[ j ] * ( 1.0f - h[ j ] ) * x[ t ][ i ];
         }
     }
-} /* end update_eligibilities */
+}
